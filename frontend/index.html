@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentCheckIn — Daily Check-in untuk Agent ID Holder</title>
+<style>
+  :root {
+    --bg: #f4f4f2;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #e0e0dc;
+    --accent: #2563eb;
+    --accent-dark: #1d4ed8;
+    --green: #15803d;
+    --green-bg: #dcfce7;
+    --red: #b91c1c;
+    --red-bg: #fee2e2;
+    --amber: #92400e;
+    --amber-bg: #fef3c7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .container { max-width: 720px; margin: 0 auto; padding: 16px; }
+  header { text-align: center; padding: 24px 0 8px; }
+  header h1 { margin: 0; font-size: 1.8rem; }
+  header p { color: var(--muted); margin: 8px 0 0; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .card h2 { margin: 0 0 12px; font-size: 1.15rem; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: none; }
+  .row .label { color: var(--muted); }
+  .row .value { font-weight: 600; text-align: right; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat { background: var(--bg); border-radius: 8px; padding: 12px; text-align: center; }
+  .stat .num { font-size: 1.6rem; font-weight: 700; }
+  .stat .cap { color: var(--muted); font-size: 0.9rem; }
+  button {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+  }
+  button:hover:not(:disabled) { background: var(--accent-dark); }
+  button:disabled { background: #9ca3af; cursor: not-allowed; }
+  button.secondary { background: #e5e7eb; color: var(--text); width: auto; }
+  button.secondary:hover { background: #d1d5db; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .badge.yes { background: var(--green-bg); color: var(--green); }
+  .badge.no { background: var(--red-bg); color: var(--red); }
+  .badge.wait { background: var(--amber-bg); color: var(--amber); }
+  .status {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    display: none;
+  }
+  .status.show { display: block; }
+  .status.info { background: #eff6ff; color: #1e40af; }
+  .status.success { background: var(--green-bg); color: var(--green); }
+  .status.error { background: var(--red-bg); color: var(--red); }
+  .status.warn { background: var(--amber-bg); color: var(--amber); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; word-break: break-all; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 8px 4px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; }
+  .note { color: var(--muted); font-size: 0.85rem; text-align: center; margin: 24px 0 8px; }
+  footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding-bottom: 24px; }
+  @media (max-width: 480px) {
+    header h1 { font-size: 1.5rem; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>AgentCheckIn</h1>
+    <p>Check-in harian untuk pemegang Binance Agent ID di BNB Smart Chain.</p>
+  </header>
+
+  <!-- Wallet -->
+  <div class="card">
+    <h2>Wallet</h2>
+    <div id="walletInfo">
+      <p style="color:var(--muted);margin:0 0 12px;">Hubungkan wallet untuk melihat status Agent ID dan check-in.</p>
+    </div>
+    <button id="connectBtn" type="button">Connect Wallet</button>
+    <button id="switchBtn" type="button" class="secondary" style="display:none;margin-top:8px;">Pindah ke BSC (Chain 56)</button>
+    <div id="walletStatus" class="status"></div>
+  </div>
+
+  <!-- Agent ID -->
+  <div class="card">
+    <h2>Status Agent ID</h2>
+    <div class="row"><span class="label">Agent ID</span><span class="value" id="agentIdStatus">—</span></div>
+    <div class="row"><span class="label">Alamat wallet</span><span class="value mono" id="walletAddr">—</span></div>
+    <p id="noAgentIdNote" style="display:none;color:var(--red);margin:12px 0 0;">
+      Wallet ini tidak memegang Agent ID, jadi check-in tidak tersedia.
+      Check-in hanya untuk pemegang Agent ID.
+    </p>
+  </div>
+
+  <!-- Statistik user -->
+  <div class="card">
+    <h2>Statistik Kamu</h2>
+    <div class="stats-grid">
+      <div class="stat"><div class="num" id="streakVal">—</div><div class="cap">Streak (hari)</div></div>
+      <div class="stat"><div class="num" id="totalVal">—</div><div class="cap">Total check-in</div></div>
+    </div>
+    <div style="margin-top:12px;">
+      <div class="row"><span class="label">Check-in terakhir</span><span class="value" id="lastVal">—</span></div>
+      <div class="row"><span class="label">Bisa check-in hari ini</span><span class="value" id="canVal">—</span></div>
+    </div>
+  </div>
+
+  <!-- Check-in -->
+  <div class="card">
+    <h2>Check-in Hari Ini</h2>
+    <p style="color:var(--muted);margin-top:0;">Satu check-in per hari (waktu UTC). Transaksi dikonfirmasi di wallet kamu sendiri — halaman ini tidak pernah menandatangani apa pun tanpa persetujuanmu.</p>
+    <button id="checkInBtn" type="button" disabled>Check-in</button>
+    <div id="txStatus" class="status"></div>
+  </div>
+
+  <!-- Statistik global -->
+  <div class="card">
+    <h2>Statistik Global</h2>
+    <div class="stats-grid">
+      <div class="stat"><div class="num" id="globalTotal">—</div><div class="cap">Total check-in</div></div>
+      <div class="stat"><div class="num" id="globalUnique">—</div><div class="cap">Checker unik</div></div>
+    </div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="card">
+    <h2>Leaderboard — Top 10</h2>
+    <div id="leaderboardStatus" style="color:var(--muted);">Memuat…</div>
+    <table id="leaderboardTable" style="display:none;">
+      <thead>
+        <tr><th>#</th><th>Alamat</th><th class="num">Check-in</th><th class="num">Streak</th></tr>
+      </thead>
+      <tbody id="leaderboardBody"></tbody>
+    </table>
+  </div>
+
+  <p class="note">Check-in hanya butuh gas BNB, tanpa fee dan tanpa token.</p>
+  <footer>AgentCheckIn — dApp statis untuk Binance Agent ID Hackathon. Kontrak: <span class="mono" id="contractAddrLabel">belum di-deploy</span></footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   CONFIG — isi setelah deploy
+   ===================================================================== */
+const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // GANTI SETELAH DEPLOY
+const DEPLOY_BLOCK = 0; // GANTI DENGAN BLOCK DEPLOY untuk leaderboard
+const AGENT_ID_ADDRESS = "0x60b9262456de011f7d15a54cdd8c48baaa8b022f"; // Kontrak Agent ID asli, BSC mainnet
+const CHAIN_ID = 56; // BSC mainnet
+
+const CONTRACT_DEPLOYED = CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000";
+
+/* ABI AgentCheckIn — disalin persis dari ../abi.json (11 entries) */
+const ABI = [
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "agentId_",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "AGENT_ID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IAgentID"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "canCheckIn",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "checkIn",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getLastCheckIn",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getStreak",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getTotalCheckIns",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalCheckIns",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "uniqueCheckers",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "CheckIn",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "streak",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalCheckIns",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "timestamp",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "ZeroAgentId",
+    "inputs": []
+  }
+];
+
+/* ABI minimal ERC-721 untuk balanceOf (cek kepemilikan Agent ID) */
+const AGENT_ID_ABI = [
+  "function balanceOf(address owner) view returns (uint256)"
+];
+
+/* =====================================================================
+   State & helpers
+   ===================================================================== */
+let provider = null;      // BrowserProvider (window.ethereum)
+let readProvider = null;  // JsonRpcProvider publik BSC (untuk statistik global tanpa wallet)
+let signer = null;
+let account = null;
+let checkInContract = null; // dengan signer, setelah connect
+let readContract = null;    // read-only, setelah halaman dimuat
+
+const $ = (id) => document.getElementById(id);
+
+function shortAddr(addr) {
+  if (!addr) return "—";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+function showStatus(el, msg, kind) {
+  el.textContent = msg;
+  el.className = "status show " + (kind || "info");
+}
+function hideStatus(el) { el.className = "status"; el.textContent = ""; }
+
+function formatDate(ts) {
+  if (!ts || Number(ts) === 0) return "Belum pernah";
+  const d = new Date(Number(ts) * 1000);
+  return d.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function friendlyError(err) {
+  if (!err) return "Terjadi kesalahan yang tidak diketahui.";
+  if (err.code === 4001 || err.code === "ACTION_REJECTED") return "Transaksi ditolak di wallet. Tidak ada yang berubah.";
+  if (err.code === 4902) return "Chain BSC belum ada di wallet. Coba tambahkan jaringan BSC secara manual.";
+  const msg = (err.reason || err.message || String(err));
+  if (/Not an Agent ID holder/i.test(msg)) return "Wallet ini tidak memegang Agent ID.";
+  if (/Already checked in/i.test(msg)) return "Kamu sudah check-in hari ini. Coba lagi besok (UTC).";
+  if (/insufficient funds/i.test(msg)) return "Saldo BNB tidak cukup untuk gas.";
+  if (msg.length > 200) return msg.slice(0, 200) + "…";
+  return msg;
+}
+
+/* =====================================================================
+   Koneksi wallet
+   ===================================================================== */
+async function connectWallet() {
+  if (!window.ethereum) {
+    showStatus($("walletStatus"), "Wallet tidak ditemukan. Pasang MetaMask atau Binance Wallet, lalu muat ulang halaman.", "error");
+    return;
+  }
+  try {
+    showStatus($("walletStatus"), "Meminta koneksi wallet…", "info");
+    provider = new ethers.BrowserProvider(window.ethereum);
+    const accounts = await provider.send("eth_requestAccounts", []);
+    if (!accounts || accounts.length === 0) {
+      showStatus($("walletStatus"), "Tidak ada akun yang dipilih.", "error");
+      return;
+    }
+    account = accounts[0];
+    signer = await provider.getSigner();
+    await onAccountReady();
+  } catch (err) {
+    console.error(err);
+    showStatus($("walletStatus"), friendlyError(err), "error");
+  }
+}
+
+async function onAccountReady() {
+  $("walletInfo").innerHTML =
+    '<div class="row"><span class="label">Terhubung</span><span class="value mono">' + shortAddr(account) + '</span></div>';
+  $("walletAddr").textContent = shortAddr(account);
+  $("connectBtn").textContent = "Terhubung: " + shortAddr(account);
+  $("connectBtn").disabled = true;
+  hideStatus($("walletStatus"));
+
+  // Deteksi chain
+  const net = await provider.getNetwork();
+  if (Number(net.chainId) !== CHAIN_ID) {
+    showStatus($("walletStatus"), "Wallet terhubung ke chain " + net.chainId + " (" + (net.name || "unknown") + "), bukan BSC (56). Pindah chain untuk check-in.", "warn");
+    $("switchBtn").style.display = "inline-block";
+  } else {
+    $("switchBtn").style.display = "none";
+  }
+
+  if (CONTRACT_DEPLOYED) {
+    checkInContract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+  }
+  await refreshUserStats();
+  await loadLeaderboard();
+}
+
+async function switchToBsc() {
+  if (!window.ethereum) return;
+  try {
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: "0x" + CHAIN_ID.toString(16) }]
+    });
+    hideStatus($("walletStatus"));
+    $("switchBtn").style.display = "none";
+    await onAccountReady();
+  } catch (err) {
+    if (err && err.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: "0x" + CHAIN_ID.toString(16),
+            chainName: "BNB Smart Chain",
+            nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+            rpcUrls: ["https://bsc-dataseed.bnbchain.org"],
+            blockExplorerUrls: ["https://bscscan.com"]
+          }]
+        });
+        await onAccountReady();
+      } catch (addErr) {
+        showStatus($("walletStatus"), friendlyError(addErr), "error");
+      }
+    } else {
+      showStatus($("walletStatus"), friendlyError(err), "error");
+    }
+  }
+}
+
+/* =====================================================================
+   Statistik user
+   ===================================================================== */
+async function refreshUserStats() {
+  if (!account) return;
+  const setDash = () => {
+    ["streakVal", "totalVal", "lastVal", "canVal"].forEach((id) => { $(id).textContent = "—"; });
+    $("agentIdStatus").innerHTML = '<span class="badge wait">Tidak tersedia</span>';
+  };
+
+  try {
+    // 1. Cek kepemilikan Agent ID
+    let hasAgentId = false;
+    try {
+      const agentId = new ethers.Contract(AGENT_ID_ADDRESS, AGENT_ID_ABI, provider);
+      const bal = await agentId.balanceOf(account);
+      hasAgentId = bal > 0n;
+    } catch (err) {
+      console.error("balanceOf Agent ID gagal:", err);
+      $("agentIdStatus").innerHTML = '<span class="badge wait">Gagal dicek</span>';
+      showStatus($("walletStatus"), "Gagal mengecek Agent ID (RPC error). Coba muat ulang halaman.", "error");
+      setDash();
+      return;
+    }
+    $("agentIdStatus").innerHTML = hasAgentId
+      ? '<span class="badge yes">Ya</span>'
+      : '<span class="badge no">Tidak</span>';
+    $("noAgentIdNote").style.display = hasAgentId ? "none" : "block";
+
+    if (!CONTRACT_DEPLOYED) {
+      setDash();
+      $("agentIdStatus").innerHTML = hasAgentId
+        ? '<span class="badge yes">Ya</span>'
+        : '<span class="badge no">Tidak</span>';
+      return;
+    }
+
+    // 2. Statistik dari kontrak AgentCheckIn
+    const c = checkInContract;
+    const [streak, total, last, can] = await Promise.all([
+      c.getStreak(account),
+      c.getTotalCheckIns(account),
+      c.getLastCheckIn(account),
+      c.canCheckIn(account)
+    ]);
+    $("streakVal").textContent = streak.toString();
+    $("totalVal").textContent = total.toString();
+    $("lastVal").textContent = formatDate(last);
+    $("canVal").textContent = can ? "Ya" : "Tidak — sudah check-in hari ini";
+
+    // 3. Tombol check-in: aktif hanya jika holder + bisa check-in + chain BSC
+    const net = await provider.getNetwork();
+    const onBsc = Number(net.chainId) === CHAIN_ID;
+    const btn = $("checkInBtn");
+    btn.disabled = !(hasAgentId && can && onBsc);
+    if (!hasAgentId) btn.textContent = "Check-in (butuh Agent ID)";
+    else if (!can) btn.textContent = "Sudah check-in hari ini";
+    else if (!onBsc) btn.textContent = "Check-in (pindah ke BSC dulu)";
+    else btn.textContent = "Check-in";
+  } catch (err) {
+    console.error(err);
+    showStatus($("walletStatus"), "Gagal memuat statistik: " + friendlyError(err), "error");
+    setDash();
+  }
+}
+
+/* =====================================================================
+   Statistik global (bisa dibaca tanpa wallet, via RPC publik BSC)
+   ===================================================================== */
+async function refreshGlobalStats() {
+  if (!CONTRACT_DEPLOYED) {
+    $("globalTotal").textContent = "—";
+    $("globalUnique").textContent = "—";
+    return;
+  }
+  try {
+    if (!readContract) return;
+    const [total, unique] = await Promise.all([
+      readContract.totalCheckIns(),
+      readContract.uniqueCheckers()
+    ]);
+    $("globalTotal").textContent = total.toString();
+    $("globalUnique").textContent = unique.toString();
+  } catch (err) {
+    console.error("Statistik global gagal:", err);
+    $("globalTotal").textContent = "—";
+    $("globalUnique").textContent = "—";
+  }
+}
+
+/* =====================================================================
+   Check-in
+   ===================================================================== */
+async function doCheckIn() {
+  if (!checkInContract || !signer) {
+    showStatus($("txStatus"), "Hubungkan wallet dulu.", "error");
+    return;
+  }
+  const btn = $("checkInBtn");
+  btn.disabled = true;
+  try {
+    showStatus($("txStatus"), "Menunggu konfirmasi di wallet… (periksa pop-up wallet kamu)", "info");
+    // User HARUS konfirmasi tx sendiri di wallet — tidak ada auto-sign.
+    const tx = await checkInContract.checkIn();
+    showStatus($("txStatus"), "Transaksi dikirim: " + tx.hash + " — menunggu konfirmasi on-chain…", "info");
+    const receipt = await tx.wait();
+    if (receipt.status === 1) {
+      showStatus($("txStatus"), "Check-in berhasil! Tx: " + tx.hash, "success");
+      await refreshUserStats();
+      await refreshGlobalStats();
+      await loadLeaderboard();
+    } else {
+      showStatus($("txStatus"), "Transaksi gagal di chain. Tx: " + tx.hash, "error");
+    }
+  } catch (err) {
+    console.error(err);
+    showStatus($("txStatus"), friendlyError(err), "error");
+  } finally {
+    await refreshUserStats();
+  }
+}
+
+/* =====================================================================
+   Leaderboard top 10 (dari event CheckIn)
+   ===================================================================== */
+function utcDay(ts) {
+  return Math.floor(Number(ts) / 86400);
+}
+
+async function loadLeaderboard() {
+  const statusEl = $("leaderboardStatus");
+  const table = $("leaderboardTable");
+  const body = $("leaderboardBody");
+
+  if (!CONTRACT_DEPLOYED) {
+    statusEl.textContent = "Kontrak belum di-deploy — leaderboard aktif setelah deploy.";
+    table.style.display = "none";
+    return;
+  }
+  if (!readContract) {
+    statusEl.textContent = "Leaderboard tidak tersedia (RPC belum siap).";
+    table.style.display = "none";
+    return;
+  }
+  try {
+    statusEl.textContent = "Memuat leaderboard…";
+    const fromBlock = DEPLOY_BLOCK > 0 ? DEPLOY_BLOCK : 0;
+    const events = await readContract.queryFilter(readContract.filters.CheckIn, fromBlock, "latest");
+
+    // Agregasi per address
+    const byAddr = new Map(); // addr -> { total, days:Set }
+    for (const ev of events) {
+      const addr = ev.args.user.toLowerCase();
+      const ts = ev.args.timestamp;
+      if (!byAddr.has(addr)) byAddr.set(addr, { total: 0, days: new Set() });
+      const rec = byAddr.get(addr);
+      rec.total += 1;
+      rec.days.add(utcDay(ts));
+    }
+
+    // Streak saat ini: hitung mundur hari UTC berurutan dari hari ini (atau kemarin)
+    const today = utcDay(Math.floor(Date.now() / 1000));
+    const rows = [];
+    for (const [addr, rec] of byAddr.entries()) {
+      let streak = 0;
+      let d = rec.days.has(today) ? today : today - 1;
+      while (rec.days.has(d)) { streak += 1; d -= 1; }
+      rows.push({ addr, total: rec.total, streak });
+    }
+    rows.sort((a, b) => b.total - a.total || b.streak - a.streak);
+    const top = rows.slice(0, 10);
+
+    if (top.length === 0) {
+      statusEl.textContent = "Belum ada check-in.";
+      table.style.display = "none";
+      return;
+    }
+    body.innerHTML = "";
+    top.forEach((r, i) => {
+      const tr = document.createElement("tr");
+      const rank = document.createElement("td"); rank.textContent = String(i + 1);
+      const addr = document.createElement("td"); addr.className = "mono"; addr.textContent = shortAddr(r.addr);
+      const tot = document.createElement("td"); tot.className = "num"; tot.textContent = String(r.total);
+      const st = document.createElement("td"); st.className = "num"; st.textContent = String(r.streak);
+      tr.append(rank, addr, tot, st);
+      body.appendChild(tr);
+    });
+    statusEl.textContent = "";
+    table.style.display = "";
+  } catch (err) {
+    console.error("Leaderboard gagal:", err);
+    statusEl.textContent = "Gagal memuat leaderboard (RPC error). Coba muat ulang halaman.";
+    table.style.display = "none";
+  }
+}
+
+/* =====================================================================
+   Init
+   ===================================================================== */
+document.addEventListener("DOMContentLoaded", async () => {
+  $("contractAddrLabel").textContent = CONTRACT_DEPLOYED ? CONTRACT_ADDRESS : "belum di-deploy";
+  $("connectBtn").addEventListener("click", connectWallet);
+  $("switchBtn").addEventListener("click", switchToBsc);
+  $("checkInBtn").addEventListener("click", doCheckIn);
+
+  if (typeof ethers === "undefined") {
+    showStatus($("walletStatus"), "Gagal memuat library ethers dari CDN. Periksa koneksi internet lalu muat ulang.", "error");
+    $("leaderboardStatus").textContent = "Leaderboard tidak tersedia (ethers gagal dimuat).";
+    return;
+  }
+
+  // RPC publik read-only untuk statistik global + leaderboard tanpa wallet
+  try {
+    readProvider = new ethers.JsonRpcProvider("https://bsc-dataseed.bnbchain.org", CHAIN_ID);
+    if (CONTRACT_DEPLOYED) {
+      readContract = new ethers.Contract(CONTRACT_ADDRESS, ABI, readProvider);
+    }
+  } catch (err) {
+    console.error("Read provider gagal:", err);
+  }
+
+  await refreshGlobalStats();
+  await loadLeaderboard();
+
+  // Kalau wallet sudah pernah terhubung, pulihkan sesi secara pasif
+  if (window.ethereum) {
+    try {
+      provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.send("eth_accounts", []);
+      if (accounts && accounts.length > 0) {
+        account = accounts[0];
+        signer = await provider.getSigner();
+        await onAccountReady();
+      }
+    } catch (err) {
+      console.error("Pemulihan sesi gagal:", err);
+    }
+    window.ethereum.on("accountsChanged", (accs) => {
+      if (accs.length === 0) { window.location.reload(); return; }
+      account = accs[0];
+      onAccountReady();
+    });
+    window.ethereum.on("chainChanged", () => { window.location.reload(); });
+  }
+});
+</script>
+</body>
+</html>
